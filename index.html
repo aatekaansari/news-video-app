@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News Video Editor - Final Stable</title>
+    <title>News Video Editor - Stable</title>
     <style>
         :root { --primary: #0d6efd; --dark: #212529; }
         body { font-family: sans-serif; background: #e9ecef; margin: 0; padding: 15px; padding-bottom: 100px; }
@@ -14,11 +14,6 @@
         
         label { display: block; font-weight: bold; font-size: 13px; margin-top: 10px; color: #555; }
         input[type="file"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; }
-        
-        .clip-list { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; }
-        .clip-item { min-width: 100px; height: 100px; position: relative; border-radius: 8px; overflow: hidden; border: 2px solid #ddd; background: #eee; }
-        .clip-item img { width: 100%; height: 100%; object-fit: cover; }
-        .clip-dur { position: absolute; bottom: 0; background: rgba(0,0,0,0.7); color: white; width: 100%; text-align: center; font-size: 10px; }
         
         .btn-export { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; font-size: 16px; width: 100%; cursor: pointer; box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); }
         
@@ -31,7 +26,7 @@
 
     <div class="header">
         <h2>🎬 News Video Editor</h2>
-        <small>Server V7 (Simple & Fast)</small>
+        <small>Server V8 (Auto-Stretch)</small>
     </div>
 
     <div class="card">
@@ -47,10 +42,8 @@
         <h3>2. Visuals</h3>
         <label>🖼️ फोटो चुनें (Multiple):</label>
         <input type="file" id="imageInput" accept="image/*" multiple onchange="handleImages(this)">
-        <div class="clip-list" id="clipContainer">
-            <div style="padding:10px; color:#999; font-size:12px;">No images selected</div>
-        </div>
-        <p style="font-size:11px; color:#666;">ℹ️ सारी फोटो ऑडियो के हिसाब से बराबर चलेंगी।</p>
+        <div id="imageCount" style="margin-top:10px; font-size:12px; color:blue;"></div>
+        <p style="font-size:11px; color:#666;">ℹ️ फोटो ऑडियो के हिसाब से अपने आप लंबी हो जाएंगी।</p>
     </div>
 
     <div class="card">
@@ -60,13 +53,13 @@
     </div>
 
     <div style="text-align:center; margin-top:20px;">
-        <button class="btn-export" onclick="exportVideo()">🚀 Export Video</button>
+        <button class="btn-export" onclick="exportVideo()">🚀 Export Full Video</button>
     </div>
 
     <div id="loader">
         <div class="spinner"></div>
         <div style="font-size:18px; font-weight:bold;" id="statusText">Processing...</div>
-        <div style="font-size:14px; color:#aaa; margin-top:5px;" id="statusDetail">Preparing...</div>
+        <div style="font-size:14px; color:#aaa; margin-top:5px;" id="statusDetail">Calculating...</div>
     </div>
 
 <script>
@@ -74,18 +67,12 @@
     let clips = [];
 
     function handleImages(input) {
-        const container = document.getElementById('clipContainer');
-        container.innerHTML = '';
         clips = [];
-
         if (input.files) {
-            Array.from(input.files).forEach((file, index) => {
-                const div = document.createElement('div');
-                div.className = 'clip-item';
-                div.innerHTML = `<img src="${URL.createObjectURL(file)}"><div class="clip-dur">${index+1}</div>`;
-                container.appendChild(div);
+            Array.from(input.files).forEach(file => {
                 clips.push({ file: file });
             });
+            document.getElementById('imageCount').innerText = `✅ ${clips.length} फोटो चुनी गई`;
         }
     }
 
@@ -96,9 +83,14 @@
         reader.onerror = () => resolve(null);
     });
 
+    // Audio Duration Calculator
     const getAudioDuration = (file) => new Promise((resolve) => {
-        const audio = new Audio(URL.createObjectURL(file));
-        audio.onloadedmetadata = () => resolve(audio.duration);
+        const url = URL.createObjectURL(file);
+        const audio = new Audio(url);
+        audio.onloadedmetadata = () => {
+            resolve(audio.duration);
+            URL.revokeObjectURL(url);
+        };
         audio.onerror = () => resolve(0);
     });
 
@@ -118,14 +110,19 @@
         statusText.innerText = "Calculating Time...";
 
         try {
-            // 1. Calculate Time (Audio Duration / Images)
-            let totalDuration = await getAudioDuration(audioFile);
-            if (!totalDuration || totalDuration === Infinity) totalDuration = 10;
-            const timePerSlide = totalDuration / clips.length;
+            // 1. Calculate Duration
+            let totalTime = await getAudioDuration(audioFile);
+            
+            // Safety: If duration fails, use default 10s per image
+            if (!totalTime || totalTime === Infinity) totalTime = clips.length * 10;
+            
+            // Divide total time by number of images
+            const timePerImage = totalTime / clips.length;
+            
+            console.log("Audio Time:", totalTime);
+            console.log("Time Per Image:", timePerImage);
 
-            console.log(`Duration: ${totalDuration}s, Slide: ${timePerSlide}s`);
-
-            // 2. Prepare Files (Simple Method - No Compression to avoid Fetch Error)
+            // 2. Prepare Files (Standard Reliable Method)
             statusText.innerText = "Processing Files...";
             const audioB64 = await fileToBase64(audioFile);
             const bgmB64 = bgmFile ? await fileToBase64(bgmFile) : null;
@@ -134,12 +131,12 @@
             let clipsData = [];
             for (let i = 0; i < clips.length; i++) {
                 statusDetail.innerText = `Preparing Image ${i+1}/${clips.length}...`;
-                // Sending Original File (Reliable)
                 const imgB64 = await fileToBase64(clips[i].file);
+                
                 if (imgB64) {
                     clipsData.push({
                         imageData: imgB64,
-                        duration: timePerSlide, // Dynamic Duration
+                        duration: timePerImage, // यहाँ जादू है (Auto Length)
                         type: 'image'
                     });
                 }
@@ -147,7 +144,7 @@
 
             // 3. Send to Server
             statusText.innerText = "Uploading...";
-            statusDetail.innerText = "फाइलें अपलोड हो रही हैं (1-2 मिनट लग सकते हैं)...";
+            statusDetail.innerText = "वीडियो बन रहा है... कृपया 1 मिनट इंतज़ार करें।";
 
             const response = await fetch(SERVER_URL, {
                 method: 'POST',
@@ -161,7 +158,8 @@
             });
 
             if (!response.ok) {
-                throw new Error("Server Error: " + await response.text());
+                const errText = await response.text();
+                throw new Error("Server Error: " + errText);
             }
 
             // 4. Download
@@ -176,7 +174,7 @@
             a.remove();
 
             loader.style.display = 'none';
-            alert("✅ वीडियो सफलतापूर्वक बन गया!");
+            alert("✅ वीडियो बन गया!");
 
         } catch (error) {
             console.error(error);
