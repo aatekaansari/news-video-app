@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News Video Editor - Stable</title>
+    <title>News Video Editor - Super Lite</title>
     <style>
         :root { --primary: #0d6efd; --dark: #212529; }
-        body { font-family: sans-serif; background: #e9ecef; margin: 0; padding: 15px; padding-bottom: 100px; }
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; padding-bottom: 100px; }
         
         .header { background: var(--primary); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
@@ -26,13 +26,14 @@
 
     <div class="header">
         <h2>🎬 News Video Editor</h2>
-        <small>Server V8 (Auto-Stretch)</small>
+        <small>Server V10 (Size Guard)</small>
     </div>
 
     <div class="card">
-        <h3>1. Audio</h3>
-        <label>🎙️ वॉइसओवर (Audio):</label>
+        <h3>1. Audio (Use MP3 Only)</h3>
+        <label>🎙️ वॉइसओवर:</label>
         <input type="file" id="mainAudio" accept="audio/*">
+        <p style="font-size:11px; color:red;">⚠️ नोट: कृपया MP3 फाइल ही चुनें (Max 5MB)। WAV फाइल बहुत भारी होती है।</p>
         
         <label>🎵 बैकग्राउंड म्यूजिक (Optional):</label>
         <input type="file" id="bgMusic" accept="audio/*">
@@ -42,8 +43,8 @@
         <h3>2. Visuals</h3>
         <label>🖼️ फोटो चुनें (Multiple):</label>
         <input type="file" id="imageInput" accept="image/*" multiple onchange="handleImages(this)">
-        <div id="imageCount" style="margin-top:10px; font-size:12px; color:blue;"></div>
-        <p style="font-size:11px; color:#666;">ℹ️ फोटो ऑडियो के हिसाब से अपने आप लंबी हो जाएंगी।</p>
+        <div id="imgCount" style="padding:10px; color:blue; font-size:12px;"></div>
+        <p style="font-size:11px; color:#666;">ℹ️ सारी फोटो ऑडियो के हिसाब से बराबर चलेंगी।</p>
     </div>
 
     <div class="card">
@@ -53,13 +54,13 @@
     </div>
 
     <div style="text-align:center; margin-top:20px;">
-        <button class="btn-export" onclick="exportVideo()">🚀 Export Full Video</button>
+        <button class="btn-export" onclick="exportVideo()">🚀 Export Video</button>
     </div>
 
     <div id="loader">
         <div class="spinner"></div>
         <div style="font-size:18px; font-weight:bold;" id="statusText">Processing...</div>
-        <div style="font-size:14px; color:#aaa; margin-top:5px;" id="statusDetail">Calculating...</div>
+        <div style="font-size:14px; color:#aaa; margin-top:5px;" id="statusDetail">Preparing...</div>
     </div>
 
 <script>
@@ -69,10 +70,8 @@
     function handleImages(input) {
         clips = [];
         if (input.files) {
-            Array.from(input.files).forEach(file => {
-                clips.push({ file: file });
-            });
-            document.getElementById('imageCount').innerText = `✅ ${clips.length} फोटो चुनी गई`;
+            Array.from(input.files).forEach(file => clips.push({ file: file }));
+            document.getElementById('imgCount').innerText = `✅ ${clips.length} Images Selected`;
         }
     }
 
@@ -83,7 +82,26 @@
         reader.onerror = () => resolve(null);
     });
 
-    // Audio Duration Calculator
+    // Image Resizer (Keeps images small)
+    const resizeImage = (file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const scale = 1280 / Math.max(img.width, 1280); 
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.6)); // Low quality for speed
+            };
+        };
+        reader.onerror = () => resolve(null);
+    });
+
     const getAudioDuration = (file) => new Promise((resolve) => {
         const url = URL.createObjectURL(file);
         const audio = new Audio(url);
@@ -104,47 +122,47 @@
         const logoFile = document.getElementById('logoInput').files[0];
 
         if (!audioFile) return alert("❌ ऑडियो चुनना जरुरी है।");
+        
+        // --- SIZE CHECKER (Prevent Upload Fail) ---
+        const fileSizeMB = audioFile.size / (1024 * 1024);
+        if (fileSizeMB > 8) {
+            return alert(`❌ आपकी ऑडियो फाइल बहुत बड़ी है (${fileSizeMB.toFixed(1)} MB)।\n\nकृपया MP3 फाइल इस्तेमाल करें या इसे छोटा करें।\nWAV फाइल अपलोड न करें।`);
+        }
+
         if (clips.length === 0) return alert("❌ कम से कम एक फोटो चुनें।");
 
         loader.style.display = 'flex';
-        statusText.innerText = "Calculating Time...";
+        statusText.innerText = "Calculating...";
 
         try {
-            // 1. Calculate Duration
+            // 1. Duration
             let totalTime = await getAudioDuration(audioFile);
-            
-            // Safety: If duration fails, use default 10s per image
-            if (!totalTime || totalTime === Infinity) totalTime = clips.length * 10;
-            
-            // Divide total time by number of images
+            if (!totalTime || totalTime === Infinity) totalTime = clips.length * 5;
             const timePerImage = totalTime / clips.length;
-            
-            console.log("Audio Time:", totalTime);
-            console.log("Time Per Image:", timePerImage);
 
-            // 2. Prepare Files (Standard Reliable Method)
-            statusText.innerText = "Processing Files...";
+            // 2. Process Files
+            statusText.innerText = "Optimizing Files...";
             const audioB64 = await fileToBase64(audioFile);
             const bgmB64 = bgmFile ? await fileToBase64(bgmFile) : null;
             const logoB64 = logoFile ? await fileToBase64(logoFile) : null;
 
             let clipsData = [];
             for (let i = 0; i < clips.length; i++) {
-                statusDetail.innerText = `Preparing Image ${i+1}/${clips.length}...`;
-                const imgB64 = await fileToBase64(clips[i].file);
-                
+                statusDetail.innerText = `Compressing Image ${i+1}/${clips.length}...`;
+                // Always resize to ensure upload success
+                const imgB64 = await resizeImage(clips[i].file);
                 if (imgB64) {
                     clipsData.push({
                         imageData: imgB64,
-                        duration: timePerImage, // यहाँ जादू है (Auto Length)
+                        duration: timePerImage,
                         type: 'image'
                     });
                 }
             }
 
-            // 3. Send to Server
-            statusText.innerText = "Uploading...";
-            statusDetail.innerText = "वीडियो बन रहा है... कृपया 1 मिनट इंतज़ार करें।";
+            // 3. Send
+            statusText.innerText = "Uploading to Server...";
+            statusDetail.innerText = "MP3 होने की वजह से अब जल्दी अपलोड होगा...";
 
             const response = await fetch(SERVER_URL, {
                 method: 'POST',
@@ -157,10 +175,7 @@
                 })
             });
 
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error("Server Error: " + errText);
-            }
+            if (!response.ok) throw new Error(await response.text());
 
             // 4. Download
             statusText.innerText = "Downloading...";
@@ -174,7 +189,7 @@
             a.remove();
 
             loader.style.display = 'none';
-            alert("✅ वीडियो बन गया!");
+            alert("✅ वीडियो सफलतापूर्वक बन गया!");
 
         } catch (error) {
             console.error(error);
