@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News Video Editor - Pro</title>
+    <title>News Video Editor - Pro V7</title>
     <style>
         :root { --primary: #0d6efd; --dark: #212529; }
         body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; padding-bottom: 100px; }
@@ -22,7 +22,6 @@
         
         .btn-export { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; font-size: 16px; width: 100%; cursor: pointer; box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); }
         
-        /* Loader */
         #loader { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
         .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -32,32 +31,28 @@
 
     <div class="header">
         <h2>🎬 News Video Editor</h2>
-        <small>Server V6 (Auto-Compressor)</small>
+        <small>Server V7 (Stable)</small>
     </div>
 
-    <!-- 1. Audio -->
     <div class="card">
         <h3>1. Audio</h3>
-        <label>🎙️ वॉइसओवर (Voiceover):</label>
+        <label>🎙️ वॉइसओवर (Audio):</label>
         <input type="file" id="mainAudio" accept="audio/*">
         
         <label>🎵 बैकग्राउंड म्यूजिक (Optional):</label>
         <input type="file" id="bgMusic" accept="audio/*">
     </div>
 
-    <!-- 2. Images -->
     <div class="card">
         <h3>2. Visuals</h3>
         <label>🖼️ फोटो चुनें (Multiple):</label>
         <input type="file" id="imageInput" accept="image/*" multiple onchange="handleImages(this)">
-        
         <div class="clip-list" id="clipContainer">
             <div style="padding:10px; color:#999; font-size:12px;">No images selected</div>
         </div>
         <p style="font-size:11px; color:#666;">ℹ️ सारी फोटो ऑडियो के हिसाब से बराबर चलेंगी।</p>
     </div>
 
-    <!-- 3. Logo -->
     <div class="card">
         <h3>3. Logo</h3>
         <label>📺 चैनल लोगो (PNG):</label>
@@ -65,10 +60,9 @@
     </div>
 
     <div style="text-align:center; margin-top:20px;">
-        <button class="btn-export" onclick="exportVideo()">🚀 Export Video (Fast)</button>
+        <button class="btn-export" onclick="exportVideo()">🚀 Export Video</button>
     </div>
 
-    <!-- Loader -->
     <div id="loader">
         <div class="spinner"></div>
         <div style="font-size:18px; font-weight:bold;" id="statusText">Processing...</div>
@@ -95,9 +89,15 @@
         }
     }
 
-    // --- NEW: IMAGE COMPRESSOR ---
-    // This reduces file size before sending to avoid memory crash
-    const compressImage = (file) => new Promise((resolve, reject) => {
+    const fileToBase64 = (file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+    });
+
+    // Smart Compressor with Fallback
+    const compressImage = (file) => new Promise((resolve) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = (event) => {
@@ -105,26 +105,15 @@
             img.src = event.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                // Resize to max 1280px width (HD)
-                const scale = 1280 / Math.max(img.width, 1280);
+                const scale = 1280 / Math.max(img.width, 1280); // Max width 1280
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
-                
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                // Compress to JPEG 0.7 quality
-                resolve(canvas.toDataURL('image/jpeg', 0.7));
+                resolve(canvas.toDataURL('image/jpeg', 0.8)); // Return compressed
             };
-            img.onerror = () => reject("Invalid Image File");
+            img.onerror = () => resolve(event.target.result); // Fallback to original
         };
-        reader.onerror = () => reject("File Read Error");
-    });
-
-    const fileToBase64 = (file) => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
         reader.onerror = () => resolve(null);
     });
 
@@ -150,37 +139,44 @@
         statusText.innerText = "Calculating...";
 
         try {
-            // 1. Duration Calc
+            // 1. Duration Logic
             let totalDuration = await getAudioDuration(audioFile);
-            if (!totalDuration) totalDuration = 10; // Fallback
+            if (!totalDuration || totalDuration === Infinity) totalDuration = 10;
             const timePerSlide = totalDuration / clips.length;
 
-            // 2. Process Files
-            statusText.innerText = "Compressing Images...";
+            // 2. Prepare Files
+            statusText.innerText = "Processing Files...";
             const audioB64 = await fileToBase64(audioFile);
+            
+            // Check if audio failed
+            if(!audioB64) throw new Error("Audio file failed to load.");
+
             const bgmB64 = bgmFile ? await fileToBase64(bgmFile) : null;
             const logoB64 = logoFile ? await fileToBase64(logoFile) : null;
 
+            // 3. Process Images (Hybrid Mode)
             let clipsData = [];
             for (let i = 0; i < clips.length; i++) {
-                statusDetail.innerText = `Optimizing Image ${i+1}/${clips.length}...`;
-                try {
-                    // Use Compressor here
-                    const imgB64 = await compressImage(clips[i].file);
+                statusDetail.innerText = `Preparing Image ${i+1}/${clips.length}...`;
+                
+                // Try compress, if fail, use original base64
+                let imgB64 = await compressImage(clips[i].file);
+                if (!imgB64) imgB64 = await fileToBase64(clips[i].file); 
+
+                if (imgB64) {
                     clipsData.push({
                         imageData: imgB64,
                         duration: timePerSlide,
                         type: 'image'
                     });
-                } catch (e) {
-                    console.error("Skipping bad image:", e);
-                    // Just skip the bad image, don't crash
                 }
             }
 
-            // 3. Send
-            statusText.innerText = "Uploading to Server...";
-            statusDetail.innerText = "कृपया इंतज़ार करें...";
+            if (clipsData.length === 0) throw new Error("No images could be processed.");
+
+            // 4. Send to Server
+            statusText.innerText = "Creating Video...";
+            statusDetail.innerText = "Upload हो रहा है, कृपया इंतज़ार करें...";
 
             const response = await fetch(SERVER_URL, {
                 method: 'POST',
@@ -194,14 +190,16 @@
             });
 
             if (!response.ok) {
-                throw new Error(await response.text());
+                const err = await response.text();
+                throw new Error("Server Error: " + err);
             }
 
-            // 4. Download
+            // 5. Download
             statusText.innerText = "Downloading...";
             const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = window.URL.createObjectURL(blob);
+            a.href = url;
             a.download = `News_${Date.now()}.mp4`;
             document.body.appendChild(a);
             a.click();
