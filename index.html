@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News Video Editor - Pro V7</title>
+    <title>News Video Editor - Final Stable</title>
     <style>
         :root { --primary: #0d6efd; --dark: #212529; }
-        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; padding-bottom: 100px; }
+        body { font-family: sans-serif; background: #e9ecef; margin: 0; padding: 15px; padding-bottom: 100px; }
         
         .header { background: var(--primary); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
@@ -31,7 +31,7 @@
 
     <div class="header">
         <h2>🎬 News Video Editor</h2>
-        <small>Server V7 (Stable)</small>
+        <small>Server V7 (Simple & Fast)</small>
     </div>
 
     <div class="card">
@@ -96,27 +96,6 @@
         reader.onerror = () => resolve(null);
     });
 
-    // Smart Compressor with Fallback
-    const compressImage = (file) => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const scale = 1280 / Math.max(img.width, 1280); // Max width 1280
-                canvas.width = img.width * scale;
-                canvas.height = img.height * scale;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/jpeg', 0.8)); // Return compressed
-            };
-            img.onerror = () => resolve(event.target.result); // Fallback to original
-        };
-        reader.onerror = () => resolve(null);
-    });
-
     const getAudioDuration = (file) => new Promise((resolve) => {
         const audio = new Audio(URL.createObjectURL(file));
         audio.onloadedmetadata = () => resolve(audio.duration);
@@ -136,47 +115,39 @@
         if (clips.length === 0) return alert("❌ कम से कम एक फोटो चुनें।");
 
         loader.style.display = 'flex';
-        statusText.innerText = "Calculating...";
+        statusText.innerText = "Calculating Time...";
 
         try {
-            // 1. Duration Logic
+            // 1. Calculate Time (Audio Duration / Images)
             let totalDuration = await getAudioDuration(audioFile);
             if (!totalDuration || totalDuration === Infinity) totalDuration = 10;
             const timePerSlide = totalDuration / clips.length;
 
-            // 2. Prepare Files
+            console.log(`Duration: ${totalDuration}s, Slide: ${timePerSlide}s`);
+
+            // 2. Prepare Files (Simple Method - No Compression to avoid Fetch Error)
             statusText.innerText = "Processing Files...";
             const audioB64 = await fileToBase64(audioFile);
-            
-            // Check if audio failed
-            if(!audioB64) throw new Error("Audio file failed to load.");
-
             const bgmB64 = bgmFile ? await fileToBase64(bgmFile) : null;
             const logoB64 = logoFile ? await fileToBase64(logoFile) : null;
 
-            // 3. Process Images (Hybrid Mode)
             let clipsData = [];
             for (let i = 0; i < clips.length; i++) {
                 statusDetail.innerText = `Preparing Image ${i+1}/${clips.length}...`;
-                
-                // Try compress, if fail, use original base64
-                let imgB64 = await compressImage(clips[i].file);
-                if (!imgB64) imgB64 = await fileToBase64(clips[i].file); 
-
+                // Sending Original File (Reliable)
+                const imgB64 = await fileToBase64(clips[i].file);
                 if (imgB64) {
                     clipsData.push({
                         imageData: imgB64,
-                        duration: timePerSlide,
+                        duration: timePerSlide, // Dynamic Duration
                         type: 'image'
                     });
                 }
             }
 
-            if (clipsData.length === 0) throw new Error("No images could be processed.");
-
-            // 4. Send to Server
-            statusText.innerText = "Creating Video...";
-            statusDetail.innerText = "Upload हो रहा है, कृपया इंतज़ार करें...";
+            // 3. Send to Server
+            statusText.innerText = "Uploading...";
+            statusDetail.innerText = "फाइलें अपलोड हो रही हैं (1-2 मिनट लग सकते हैं)...";
 
             const response = await fetch(SERVER_URL, {
                 method: 'POST',
@@ -190,11 +161,10 @@
             });
 
             if (!response.ok) {
-                const err = await response.text();
-                throw new Error("Server Error: " + err);
+                throw new Error("Server Error: " + await response.text());
             }
 
-            // 5. Download
+            // 4. Download
             statusText.innerText = "Downloading...";
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
