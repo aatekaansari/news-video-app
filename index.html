@@ -25,19 +25,26 @@
         .btn-export { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; font-size: 16px; width: 100%; max-width: 400px; cursor: pointer; box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); }
         .btn-export:disabled { background: #ccc; cursor: not-allowed; }
 
+        /* Server Status Indicator */
+        #serverIndicator { font-size: 12px; font-weight: bold; margin-top: 5px; }
+        .status-offline { color: red; }
+        .status-online { color: #43e97b; }
+        .status-waking { color: orange; animation: blink 1s infinite; }
+
         /* Loading Overlay */
         #loader { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
         .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes blink { 50% { opacity: 0.5; } }
         .status-msg { font-size: 18px; font-weight: bold; }
-        .status-detail { font-size: 14px; color: #aaa; margin-top: 5px; }
+        .status-detail { font-size: 14px; color: #aaa; margin-top: 5px; max-width: 80%; text-align: center; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h2>🎬 News Video Editor (HD)</h2>
-        <small>Connected to Server</small>
+        <div id="serverIndicator" class="status-waking">🟠 Connecting to Server...</div>
     </div>
 
     <!-- 1. Audio Section -->
@@ -53,7 +60,7 @@
     <!-- 2. Images Section -->
     <div class="card">
         <h3>2. Visuals (Images)</h3>
-        <label>🖼️ खबर की फोटो चुनें:</label>
+        <label>🖼️ खबर की फोटो चुनें (Multiple):</label>
         <input type="file" id="imageInput" accept="image/*" multiple onchange="handleImages(this)">
         
         <div class="clip-list" id="clipContainer">
@@ -71,7 +78,7 @@
 
     <!-- Export Button -->
     <div class="export-bar">
-        <button class="btn-export" onclick="exportVideo()">🚀 Export Full HD Video</button>
+        <button class="btn-export" id="exportBtn" onclick="exportVideo()">🚀 Export Full HD Video</button>
     </div>
 
     <!-- Loader -->
@@ -79,13 +86,34 @@
         <div class="spinner"></div>
         <div class="status-msg" id="statusText">Connecting...</div>
         <div class="status-detail" id="statusDetail">Please wait</div>
+        <button onclick="document.getElementById('loader').style.display='none'" style="margin-top:20px; background:none; border:1px solid white; color:white; padding:5px 10px; border-radius:5px;">Cancel / Close</button>
     </div>
 
 <script>
-    // --- SERVER URL (UPDATED) ---
-    const SERVER_URL = "https://news-video-server.onrender.com/render";
+    // --- SERVER URL ---
+    const SERVER_BASE = "https://news-video-server.onrender.com";
+    const SERVER_URL = `${SERVER_BASE}/render`;
 
     let clips = [];
+
+    // 1. Check Server Status on Load
+    window.addEventListener('DOMContentLoaded', async () => {
+        const ind = document.getElementById('serverIndicator');
+        try {
+            const res = await fetch(SERVER_BASE);
+            if(res.ok) {
+                ind.className = 'status-online';
+                ind.innerText = '🟢 Server Online & Ready';
+            } else {
+                throw new Error("Server not OK");
+            }
+        } catch (e) {
+            ind.className = 'status-waking';
+            ind.innerText = '🟠 Server Waking Up (Please wait 1 min)...';
+            // Retry ping
+            setTimeout(() => location.reload(), 60000); 
+        }
+    });
 
     // Image Handling
     function handleImages(input) {
@@ -107,12 +135,12 @@
         }
     }
 
-    // Helper: File to Base64
+    // Fixed File Reader (No Undefined Errors)
     const fileToBase64 = (file) => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
+        reader.onerror = (e) => reject(new Error("File Read Error: " + file.name));
     });
 
     // --- MAIN EXPORT FUNCTION ---
@@ -133,6 +161,7 @@
         statusDetail.innerText = "फाइलों को तैयार किया जा रहा है...";
 
         try {
+            // 1. Prepare Data
             const audioB64 = await fileToBase64(audioFile);
             const bgmB64 = bgmFile ? await fileToBase64(bgmFile) : null;
             const logoB64 = logoFile ? await fileToBase64(logoFile) : null;
@@ -148,8 +177,9 @@
                 });
             }
 
+            // 2. Send to Server
             statusText.innerText = "Creating Video on Server...";
-            statusDetail.innerText = "कृपया इंतज़ार करें, इसमें 1-2 मिनट लग सकते हैं...";
+            statusDetail.innerText = "सर्वर पर वीडियो बन रहा है। अगर सर्वर सो रहा था, तो इसमें 2 मिनट लग सकते हैं। कृपया बंद न करें...";
 
             const payload = {
                 audioData: audioB64,
@@ -166,9 +196,10 @@
 
             if (!response.ok) {
                 const errText = await response.text();
-                throw new Error("Server Error: " + errText);
+                throw new Error("Server Error: " + (errText || response.statusText));
             }
 
+            // 3. Download
             statusText.innerText = "Downloading...";
             statusDetail.innerText = "वीडियो बन गया है, डाउनलोड हो रहा है...";
 
@@ -187,7 +218,9 @@
         } catch (error) {
             console.error(error);
             loader.style.display = 'none';
-            alert("❌ त्रुटि: " + error.message);
+            // Safe Error Message
+            const msg = error.message ? error.message : "Unknown Error (Check Network)";
+            alert("❌ त्रुटि: " + msg);
         }
     }
 </script>
