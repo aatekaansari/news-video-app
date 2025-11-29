@@ -3,119 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News Video Editor - HD Server Edition</title>
+    <title>News Video Editor - Pro</title>
     <style>
-        :root { --primary: #0d6efd; --dark: #212529; --light: #f8f9fa; }
-        body { font-family: sans-serif; background: #e9ecef; margin: 0; padding: 15px; padding-bottom: 100px; }
+        :root { --primary: #0d6efd; --dark: #212529; }
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; padding-bottom: 100px; }
         
-        .header { background: var(--primary); color: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; text-align: center; }
+        .header { background: var(--primary); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        h3 { margin-top: 0; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; color: var(--dark); font-size: 16px; }
+        h3 { margin: 0 0 10px 0; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; color: var(--dark); font-size: 16px; }
         
         label { display: block; font-weight: bold; font-size: 13px; margin-top: 10px; color: #555; }
-        input[type="text"], input[type="file"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+        input[type="file"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; }
         
-        .btn-add { background: #198754; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-top: 5px; font-size: 14px; }
         .clip-list { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; }
-        .clip-item { min-width: 100px; height: 100px; position: relative; border-radius: 8px; overflow: hidden; border: 2px solid #ddd; }
+        .clip-item { min-width: 100px; height: 100px; position: relative; border-radius: 8px; overflow: hidden; border: 2px solid #ddd; background: #eee; }
         .clip-item img { width: 100%; height: 100%; object-fit: cover; }
-        .clip-dur { position: absolute; bottom: 0; background: rgba(0,0,0,0.7); color: white; width: 100%; text-align: center; font-size: 10px; padding: 2px; }
+        .clip-dur { position: absolute; bottom: 0; background: rgba(0,0,0,0.7); color: white; width: 100%; text-align: center; font-size: 10px; }
         
-        .export-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); text-align: center; }
-        .btn-export { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; font-size: 16px; width: 100%; max-width: 400px; cursor: pointer; box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); }
-        .btn-export:disabled { background: #ccc; cursor: not-allowed; }
-
-        /* Server Status Indicator */
-        #serverIndicator { font-size: 12px; font-weight: bold; margin-top: 5px; }
-        .status-offline { color: red; }
-        .status-online { color: #43e97b; }
-        .status-waking { color: orange; animation: blink 1s infinite; }
-
-        /* Loading Overlay */
-        #loader { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
-        .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        .btn-export { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; font-size: 16px; width: 100%; cursor: pointer; box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); }
+        
+        /* Loader */
+        #loader { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes blink { 50% { opacity: 0.5; } }
-        .status-msg { font-size: 18px; font-weight: bold; }
-        .status-detail { font-size: 14px; color: #aaa; margin-top: 5px; max-width: 80%; text-align: center; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h2>🎬 News Video Editor (HD)</h2>
-        <div id="serverIndicator" class="status-waking">🟠 Connecting to Server...</div>
+        <h2>🎬 News Video Editor</h2>
+        <small>Server V6 (Auto-Compressor)</small>
     </div>
 
-    <!-- 1. Audio Section -->
+    <!-- 1. Audio -->
     <div class="card">
-        <h3>1. Audio (Voiceover)</h3>
-        <label>🎙️ मेन ऑडियो चुनें:</label>
+        <h3>1. Audio</h3>
+        <label>🎙️ वॉइसओवर (Voiceover):</label>
         <input type="file" id="mainAudio" accept="audio/*">
         
         <label>🎵 बैकग्राउंड म्यूजिक (Optional):</label>
         <input type="file" id="bgMusic" accept="audio/*">
     </div>
 
-    <!-- 2. Images Section -->
+    <!-- 2. Images -->
     <div class="card">
-        <h3>2. Visuals (Images)</h3>
-        <label>🖼️ खबर की फोटो चुनें (Multiple):</label>
+        <h3>2. Visuals</h3>
+        <label>🖼️ फोटो चुनें (Multiple):</label>
         <input type="file" id="imageInput" accept="image/*" multiple onchange="handleImages(this)">
         
         <div class="clip-list" id="clipContainer">
-            <div style="padding:10px; color:#999; font-size:12px;">कोई फोटो नहीं चुनी गई</div>
+            <div style="padding:10px; color:#999; font-size:12px;">No images selected</div>
         </div>
-        <p style="font-size:11px; color:#666;">* हर फोटो 5 सेकंड दिखेगी।</p>
+        <p style="font-size:11px; color:#666;">ℹ️ सारी फोटो ऑडियो के हिसाब से बराबर चलेंगी।</p>
     </div>
 
-    <!-- 3. Overlays -->
+    <!-- 3. Logo -->
     <div class="card">
-        <h3>3. Graphics</h3>
+        <h3>3. Logo</h3>
         <label>📺 चैनल लोगो (PNG):</label>
         <input type="file" id="logoInput" accept="image/*">
     </div>
 
-    <!-- Export Button -->
-    <div class="export-bar">
-        <button class="btn-export" id="exportBtn" onclick="exportVideo()">🚀 Export Full HD Video</button>
+    <div style="text-align:center; margin-top:20px;">
+        <button class="btn-export" onclick="exportVideo()">🚀 Export Video (Fast)</button>
     </div>
 
     <!-- Loader -->
     <div id="loader">
         <div class="spinner"></div>
-        <div class="status-msg" id="statusText">Connecting...</div>
-        <div class="status-detail" id="statusDetail">Please wait</div>
-        <button onclick="document.getElementById('loader').style.display='none'" style="margin-top:20px; background:none; border:1px solid white; color:white; padding:5px 10px; border-radius:5px;">Cancel / Close</button>
+        <div style="font-size:18px; font-weight:bold;" id="statusText">Processing...</div>
+        <div style="font-size:14px; color:#aaa; margin-top:5px;" id="statusDetail">Preparing...</div>
     </div>
 
 <script>
-    // --- SERVER URL ---
-    const SERVER_BASE = "https://news-video-server.onrender.com";
-    const SERVER_URL = `${SERVER_BASE}/render`;
-
+    const SERVER_URL = "https://news-video-server.onrender.com/render";
     let clips = [];
 
-    // 1. Check Server Status on Load
-    window.addEventListener('DOMContentLoaded', async () => {
-        const ind = document.getElementById('serverIndicator');
-        try {
-            const res = await fetch(SERVER_BASE);
-            if(res.ok) {
-                ind.className = 'status-online';
-                ind.innerText = '🟢 Server Online & Ready';
-            } else {
-                throw new Error("Server not OK");
-            }
-        } catch (e) {
-            ind.className = 'status-waking';
-            ind.innerText = '🟠 Server Waking Up (Please wait 1 min)...';
-            // Retry ping
-            setTimeout(() => location.reload(), 60000); 
-        }
-    });
-
-    // Image Handling
     function handleImages(input) {
         const container = document.getElementById('clipContainer');
         container.innerHTML = '';
@@ -125,25 +88,52 @@
             Array.from(input.files).forEach((file, index) => {
                 const div = document.createElement('div');
                 div.className = 'clip-item';
-                div.innerHTML = `
-                    <img src="${URL.createObjectURL(file)}">
-                    <div class="clip-dur">Img ${index+1}</div>
-                `;
+                div.innerHTML = `<img src="${URL.createObjectURL(file)}"><div class="clip-dur">${index+1}</div>`;
                 container.appendChild(div);
-                clips.push({ file: file, duration: 5 });
+                clips.push({ file: file });
             });
         }
     }
 
-    // Fixed File Reader (No Undefined Errors)
-    const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    // --- NEW: IMAGE COMPRESSOR ---
+    // This reduces file size before sending to avoid memory crash
+    const compressImage = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                // Resize to max 1280px width (HD)
+                const scale = 1280 / Math.max(img.width, 1280);
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Compress to JPEG 0.7 quality
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.onerror = () => reject("Invalid Image File");
+        };
+        reader.onerror = () => reject("File Read Error");
+    });
+
+    const fileToBase64 = (file) => new Promise((resolve) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = () => resolve(reader.result);
-        reader.onerror = (e) => reject(new Error("File Read Error: " + file.name));
+        reader.onerror = () => resolve(null);
     });
 
-    // --- MAIN EXPORT FUNCTION ---
+    const getAudioDuration = (file) => new Promise((resolve) => {
+        const audio = new Audio(URL.createObjectURL(file));
+        audio.onloadedmetadata = () => resolve(audio.duration);
+        audio.onerror = () => resolve(0);
+    });
+
     async function exportVideo() {
         const loader = document.getElementById('loader');
         const statusText = document.getElementById('statusText');
@@ -153,61 +143,66 @@
         const bgmFile = document.getElementById('bgMusic').files[0];
         const logoFile = document.getElementById('logoInput').files[0];
 
-        if (!audioFile) return alert("❌ कृपया पहले एक ऑडियो (Voiceover) चुनें।");
-        if (clips.length === 0) return alert("❌ कृपया कम से कम एक फोटो चुनें।");
+        if (!audioFile) return alert("❌ ऑडियो चुनना जरुरी है।");
+        if (clips.length === 0) return alert("❌ कम से कम एक फोटो चुनें।");
 
         loader.style.display = 'flex';
-        statusText.innerText = "Processing Files...";
-        statusDetail.innerText = "फाइलों को तैयार किया जा रहा है...";
+        statusText.innerText = "Calculating...";
 
         try {
-            // 1. Prepare Data
+            // 1. Duration Calc
+            let totalDuration = await getAudioDuration(audioFile);
+            if (!totalDuration) totalDuration = 10; // Fallback
+            const timePerSlide = totalDuration / clips.length;
+
+            // 2. Process Files
+            statusText.innerText = "Compressing Images...";
             const audioB64 = await fileToBase64(audioFile);
             const bgmB64 = bgmFile ? await fileToBase64(bgmFile) : null;
             const logoB64 = logoFile ? await fileToBase64(logoFile) : null;
 
             let clipsData = [];
             for (let i = 0; i < clips.length; i++) {
-                statusDetail.innerText = `Image ${i+1}/${clips.length} convert हो रही है...`;
-                const imgB64 = await fileToBase64(clips[i].file);
-                clipsData.push({
-                    imageData: imgB64,
-                    duration: 5,
-                    type: 'image'
-                });
+                statusDetail.innerText = `Optimizing Image ${i+1}/${clips.length}...`;
+                try {
+                    // Use Compressor here
+                    const imgB64 = await compressImage(clips[i].file);
+                    clipsData.push({
+                        imageData: imgB64,
+                        duration: timePerSlide,
+                        type: 'image'
+                    });
+                } catch (e) {
+                    console.error("Skipping bad image:", e);
+                    // Just skip the bad image, don't crash
+                }
             }
 
-            // 2. Send to Server
-            statusText.innerText = "Creating Video on Server...";
-            statusDetail.innerText = "सर्वर पर वीडियो बन रहा है। अगर सर्वर सो रहा था, तो इसमें 2 मिनट लग सकते हैं। कृपया बंद न करें...";
-
-            const payload = {
-                audioData: audioB64,
-                bgmData: bgmB64,
-                logoData: logoB64,
-                clips: clipsData
-            };
+            // 3. Send
+            statusText.innerText = "Uploading to Server...";
+            statusDetail.innerText = "कृपया इंतज़ार करें...";
 
             const response = await fetch(SERVER_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    audioData: audioB64,
+                    bgmData: bgmB64,
+                    logoData: logoB64,
+                    clips: clipsData
+                })
             });
 
             if (!response.ok) {
-                const errText = await response.text();
-                throw new Error("Server Error: " + (errText || response.statusText));
+                throw new Error(await response.text());
             }
 
-            // 3. Download
+            // 4. Download
             statusText.innerText = "Downloading...";
-            statusDetail.innerText = "वीडियो बन गया है, डाउनलोड हो रहा है...";
-
             const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = `News_Video_${Date.now()}.mp4`;
+            a.href = window.URL.createObjectURL(blob);
+            a.download = `News_${Date.now()}.mp4`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -218,12 +213,9 @@
         } catch (error) {
             console.error(error);
             loader.style.display = 'none';
-            // Safe Error Message
-            const msg = error.message ? error.message : "Unknown Error (Check Network)";
-            alert("❌ त्रुटि: " + msg);
+            alert("Error: " + error.message);
         }
     }
 </script>
-
 </body>
 </html>
